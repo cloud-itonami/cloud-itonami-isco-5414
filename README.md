@@ -4,6 +4,25 @@ Open Occupation Blueprint for **ISCO-08 5414**: Security Guards.
 
 This repository designs a forkable OSS business for an independent security guard practice: a patrol-support and access-log robot manages perimeter patrol and access records under a governor-gated actor, so the practice keeps its own security records instead of renting a closed guard-management SaaS.
 
+**Maturity: `:implemented`.** `src/security/` implements the
+`SecurityGuardActor` as a `langgraph.graph/state-graph`
+(`security.actor`) wired to a `Security Advisor` (`security.advisor`)
+and an independent `SecurityGuardGovernor` (`security.governor`),
+following the itonami actor pattern (ADR-2607011000): `:intake -> :advise
+-> :govern -> :decide -+-> :commit (:ok?) +-> :request-approval (:escalate?,
+human-in-the-loop interrupt) +-> :hold (:hard?)`. 14 tests / 29 assertions
+green (`clojure -M:test`). HARD invariants (always hold, never
+overridable): client provenance, no-actuation (`:effect` must be
+`:propose`), a registered site basis for any access-override proposal,
+the proposed access level not exceeding the site's registered access-
+control ceiling (granting access beyond it is an unauthorized
+override, not efficient service), and verified identity before any
+access-control override can proceed (an override without verification
+is an unverified override, not efficient service). Always-escalate ops
+(human sign-off regardless of confidence, mapping this repo's Trust
+Controls in [`docs/business-model.md`](docs/business-model.md)):
+`:approve-use-of-force-action` and `:approve-detention-action`.
+
 ## Robotics premise
 
 All cloud-itonami verticals are designed on the premise that a **robot performs
