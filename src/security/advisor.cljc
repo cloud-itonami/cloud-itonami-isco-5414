@@ -1,0 +1,60 @@
+(ns security.advisor
+  "Security Advisor — the advisor named in this repository's README,
+  proposing a security-guard operation (an access-control override,
+  approve a use-of-force action, approve a detention action) from a
+  site contract, access policy and incident report. Swappable
+  mock/llm; the advisor ONLY proposes — `security.governor` checks
+  the access-level ceiling and identity verification independently
+  and always escalates use-of-force and detention decisions. Modeled
+  on cloud-itonami-isco-4311's advisor.
+
+  A proposal: {:op :approve-access-override|:approve-use-of-force-action|:approve-detention-action
+               :effect :propose :site-id str :access-level number
+               :identity-verified? boolean :stake kw :confidence n
+               :rationale str}")
+
+(defprotocol Advisor
+  (-advise [advisor store request] "request -> proposal map"))
+
+(defn- infer [_store {:keys [op stake site-id access-level identity-verified?] :as request}]
+  {:op op
+   :effect :propose
+   :site-id site-id
+   :access-level access-level
+   :identity-verified? (boolean identity-verified?)
+   :stake (or stake :low)
+   :confidence (case (or stake :low) :high 0.7 :medium 0.85 :low 0.95)
+   :rationale (str "proposed " (name op) " for client " (:client-id request))})
+
+(defn mock-advisor []
+  (reify Advisor
+    (-advise [_ store request] (infer store request))))
+
+(def ^:private system-prompt
+  "You are a security-guard advisor. Given a request, propose an :op,
+   the :site-id, :access-level and whether identity is verified, an
+   honest :confidence and a :stake. Never propose an access level
+   beyond the site's registered access ceiling, or an override without
+   identity verification — the governor checks both against the
+   registered site record. Use-of-force and detention actions always
+   require human sign-off regardless of confidence.")
+
+(defn- parse-proposal [content]
+  (try
+    (let [p (read-string content)]
+      (if (map? p)
+        (assoc p :effect :propose)
+        {:op :unknown :effect :propose :confidence 0.0 :stake :high
+         :rationale "unparseable LLM response"}))
+    (catch #?(:clj Exception :cljs js/Error) _
+      {:op :unknown :effect :propose :confidence 0.0 :stake :high
+       :rationale "LLM response parse failure"})))
+
+(defn llm-advisor
+  [chat-model model-generate-fn gen-opts]
+  (reify Advisor
+    (-advise [_ _store request]
+      (let [msgs [{:role :system :content system-prompt}
+                  {:role :user :content (str "operation request: " (pr-str request))}]
+            resp (model-generate-fn chat-model msgs gen-opts)]
+        (parse-proposal (:content resp))))))
