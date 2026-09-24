@@ -1,5 +1,5 @@
 (ns security.actor-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [security.actor :as actor]
             [security.store :as store]))
 
