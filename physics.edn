@@ -1,0 +1,33 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:physics` runs it.
+;;
+;; README "Robotics premise": a patrol-support and access-log robot performs
+;; perimeter patrol logging, badge scanning and incident-report printing for
+;; security guards (ISCO 5414). Its physical work is driving the patrol route:
+;; each leg between checkpoints, and stopping safely when someone steps into
+;; its path. It never uses force or detains anyone.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isco-5414"
+ :cases
+ [{:id :perimeter-patrol-leg
+   :kind :transport
+   :procedure "patrol robot drives one perimeter leg from checkpoint to checkpoint, logging the route"
+   :params {:mass-kg 90.0 :payload-kg 5.0 :v-max-mps 1.2 :a-max-mps2 0.5
+            :brake-decel-mps2 1.0 :drive-force-n 200.0 :crr 0.03
+            :cog-height-m 0.70 :support-half-length-m 0.30}
+   :sweep {:param :distance-m :values [50.0 100.0 200.0 300.0 400.0]}
+   :quantity :cycle-time-s
+   :limit {:max 300.0 :basis "estimate: each checkpoint must be logged at least every 5 minutes on a single-robot perimeter tour"}
+   :boundary {:lo 10.0 :hi 800.0}}
+  {:id :emergency-stop-for-pedestrian
+   :kind :transport
+   :procedure "patrol robot brakes to a stop when a pedestrian steps into its path; the braking must not tip the tall sensor mast over"
+   :params {:mass-kg 90.0 :payload-kg 5.0 :distance-m 20.0 :v-max-mps 1.2 :a-max-mps2 0.5
+            :drive-force-n 200.0 :crr 0.03 :cog-height-m 0.70 :support-half-length-m 0.30}
+   :sweep {:param :brake-decel-mps2 :values [0.5 1.0 2.0 3.0 4.0 5.0]}
+   :quantity :min-tipover-margin
+   :limit {:min 0.3 :basis "estimate: keep at least 30 % of the static tip-over margin under braking for uneven paving and a swinging mast"}
+   :boundary {:lo 0.5 :hi 8.0}}]}
